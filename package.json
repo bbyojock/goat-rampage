@@ -1,0 +1,9 @@
+{
+  "name": "goat-rampage-server",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": { "start": "tsx server/index.ts" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "cors": "^2.8.5", "express": "^4.21.2", "tsx": "^4.19.2", "ws": "^8.18.0" }
+}
