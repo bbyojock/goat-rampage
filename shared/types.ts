@@ -1,4 +1,6 @@
-export type CharacterId = 'RAM' | 'DASH' | 'BRUTUS' | 'VOLT' | 'TITAN' | 'PHANTOM';
+export type CharacterId =
+  | 'RAM' | 'DASH' | 'BRUTUS' | 'VOLT' | 'TITAN' | 'PHANTOM'
+  | 'BLAZE' | 'FROST' | 'SAGE' | 'LANCER';
 
 export type FighterActionState =
   | 'IDLE'
@@ -56,6 +58,18 @@ export interface MoveSpec {
   effectColor: number;
   isUnblockable?: boolean;
   teleportOffsetX?: number;
+  /** 적중 시 가한 피해의 비율만큼 체력 회복 */
+  lifesteal?: number;
+  /** 연타 간격(프레임). 활성 프레임 동안 이 간격마다 다시 적중 */
+  multiHit?: number;
+  /** 적중 시 상대에게 상태이상 */
+  status?: { t: 'burn' | 'poison' | 'freeze' | 'shock'; f: number };
+  /** 사용 시 자신에게 버프 */
+  buff?: { k: 'armor' | 'haste' | 'overdrive'; f: number };
+  /** 사용 시 최대 체력 비율 회복 */
+  heal?: number;
+  /** 적중 시 상대 스태미나 감소량 */
+  staminaDrain?: number;
 }
 
 export interface CharacterDefinition {
@@ -90,7 +104,13 @@ export interface CharacterDefinition {
     attack: MoveSpec;
     headbutt: MoveSpec;
     special: MoveSpec;
+    /** ↓ + 박치기 */
+    headbutt2?: MoveSpec;
+    /** ↓ + 필살기 */
+    special2?: MoveSpec;
   };
+  /** 스프라이트 체형 */
+  body?: 'heavy' | 'slim' | 'normal';
 }
 
 export interface FighterSnapshot {
@@ -119,11 +139,19 @@ export interface FighterSnapshot {
     dodge: number;
   };
   hasHitCurrentMove: boolean;
+  /** 현재 박치기/필살기가 추가 스킬인지 ('headbutt2' | 'special2' | '') */
+  alt?: string;
   grounded: boolean;
 }
 
 export interface CombatEvent {
-  type: 'HIT' | 'BLOCK' | 'DODGE' | 'JUMP' | 'MOVE_START' | 'KO';
+  type: 'HIT' | 'BLOCK' | 'DODGE' | 'JUMP' | 'MOVE_START' | 'KO' | 'CRIT' | 'STATUS' | 'BUFF';
+  status?: string;
+  buff?: string;
+  alt?: string;
+  /** 상태이상/버프 (traits.ts) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fx?: any;
   attackerSlot?: 1 | 2;
   defenderSlot?: 1 | 2;
   moveType?: 'attack' | 'headbutt' | 'special';

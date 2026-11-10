@@ -1,6 +1,7 @@
 import { CharacterDefinition, CharacterId } from './types';
+import { applyExtraCharacters } from './extraCharacters';
 
-export const CHARACTERS: Record<CharacterId, CharacterDefinition> = {
+const BASE_CHARACTERS = {
   RAM: {
     id: 'RAM',
     name: 'RAM',
@@ -513,5 +514,9 @@ export const CHARACTERS: Record<CharacterId, CharacterDefinition> = {
     },
   },
 };
+
+// 신규 캐릭터 4명과 추가 스킬은 extraCharacters.ts 에서 합쳐집니다.
+export const CHARACTERS = BASE_CHARACTERS as unknown as Record<CharacterId, CharacterDefinition>;
+applyExtraCharacters(CHARACTERS);
 
 export const CHARACTER_LIST: CharacterDefinition[] = Object.values(CHARACTERS);

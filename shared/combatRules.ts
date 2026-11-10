@@ -37,6 +37,8 @@ export const EMPTY_INPUT: UnifiedInputState = {
   interact: false,
 };
 
+import * as Traits from './traits';
+
 export function createInitialFighter(
   slot: 1 | 2,
   characterId: CharacterId,
@@ -127,8 +129,8 @@ export function boxesOverlap(
 export function getActiveMoveSpec(fighter: FighterSnapshot): MoveSpec | null {
   const def = CHARACTERS[fighter.characterId];
   if (fighter.state === 'ATTACK') return def.moves.attack;
-  if (fighter.state === 'HEADBUTT') return def.moves.headbutt;
-  if (fighter.state === 'SPECIAL') return def.moves.special;
+  if (fighter.state === 'HEADBUTT') return (fighter.alt === 'headbutt2' && def.moves.headbutt2) || def.moves.headbutt;
+  if (fighter.state === 'SPECIAL') return (fighter.alt === 'special2' && def.moves.special2) || def.moves.special;
   return null;
 }
 
@@ -159,6 +161,7 @@ export function stepFighterPhysicsAndActions(
   if (fighter.cooldowns.special > 0) fighter.cooldowns.special--;
   if (fighter.cooldowns.dodge > 0) fighter.cooldowns.dodge--;
   if (fighter.invincibleFrames > 0) fighter.invincibleFrames--;
+  Traits.tick(fighter, def);
 
   if (fighter.comboTimerFrames > 0) {
     fighter.comboTimerFrames--;
@@ -297,44 +300,50 @@ export function stepFighterPhysicsAndActions(
     return;
   }
 
-  if (
-    input.special &&
-    fighter.cooldowns.special <= 0 &&
-    fighter.stamina >= def.moves.special.staminaCost
-  ) {
-    fighter.state = 'SPECIAL';
-    fighter.stateFrame = 0;
-    fighter.hasHitCurrentMove = false;
-    fighter.stamina -= def.moves.special.staminaCost;
-    fighter.cooldowns.special = def.moves.special.cooldownFrames;
-    events.push({
-      type: 'MOVE_START',
-      attackerSlot: fighter.slot,
-      moveType: 'special',
-      x: fighter.x,
-      y: fighter.y,
-    });
-    return;
+  if (input.special && fighter.cooldowns.special <= 0) {
+    // ↓ + 버튼 = 추가 스킬 (special2)
+    const useAlt = !!(input.crouch && fighter.grounded && def.moves.special2);
+    const m = useAlt ? def.moves.special2! : def.moves.special;
+    if (fighter.stamina >= m.staminaCost) {
+      fighter.alt = useAlt ? 'special2' : '';
+      fighter.state = 'SPECIAL';
+      fighter.stateFrame = 0;
+      fighter.hasHitCurrentMove = false;
+      fighter.stamina -= m.staminaCost;
+      fighter.cooldowns.special = m.cooldownFrames;
+      Traits.start(fighter, m, events);
+      events.push({
+        type: 'MOVE_START',
+        attackerSlot: fighter.slot,
+        moveType: 'special',
+        x: fighter.x,
+        y: fighter.y,
+      });
+      return;
+    }
   }
 
-  if (
-    input.headbutt &&
-    fighter.cooldowns.headbutt <= 0 &&
-    fighter.stamina >= def.moves.headbutt.staminaCost
-  ) {
-    fighter.state = 'HEADBUTT';
-    fighter.stateFrame = 0;
-    fighter.hasHitCurrentMove = false;
-    fighter.stamina -= def.moves.headbutt.staminaCost;
-    fighter.cooldowns.headbutt = def.moves.headbutt.cooldownFrames;
-    events.push({
-      type: 'MOVE_START',
-      attackerSlot: fighter.slot,
-      moveType: 'headbutt',
-      x: fighter.x,
-      y: fighter.y,
-    });
-    return;
+  if (input.headbutt && fighter.cooldowns.headbutt <= 0) {
+    // ↓ + 버튼 = 추가 스킬 (headbutt2)
+    const useAlt = !!(input.crouch && fighter.grounded && def.moves.headbutt2);
+    const m = useAlt ? def.moves.headbutt2! : def.moves.headbutt;
+    if (fighter.stamina >= m.staminaCost) {
+      fighter.alt = useAlt ? 'headbutt2' : '';
+      fighter.state = 'HEADBUTT';
+      fighter.stateFrame = 0;
+      fighter.hasHitCurrentMove = false;
+      fighter.stamina -= m.staminaCost;
+      fighter.cooldowns.headbutt = m.cooldownFrames;
+      Traits.start(fighter, m, events);
+      events.push({
+        type: 'MOVE_START',
+        attackerSlot: fighter.slot,
+        moveType: 'headbutt',
+        x: fighter.x,
+        y: fighter.y,
+      });
+      return;
+    }
   }
 
   if (
@@ -502,10 +511,13 @@ export function checkAndApplyAttackHit(
   const comboScaling = Math.max(0.55, 1 - defender.comboCount * 0.08);
   const finalDamage = Math.max(
     5,
-    Math.round(move.damage * defChar.stats.defense * comboScaling)
+    Math.round(move.damage * defChar.stats.defense * comboScaling * Traits.mod(attacker, defender, move, events))
   );
 
   defender.hp = Math.max(0, defender.hp - finalDamage);
+  Traits.hit(attacker, defender, move, finalDamage, events);
+  if (move.lifesteal) attacker.hp = Math.min(attacker.maxHp, attacker.hp + Math.round(finalDamage * move.lifesteal));
+  if (move.staminaDrain) defender.stamina = Math.max(0, defender.stamina - move.staminaDrain);
   defender.comboCount += 1;
   defender.comboTimerFrames = 55;
   defender.hasHitCurrentMove = false;
@@ -689,6 +701,7 @@ export function computeCpuInput(
 
     if (roll < 0.14 * difficulty && cpu.cooldowns.special <= 0 && cpu.stamina >= 40) {
       input.special = true;
+      if (Math.sin(frameCount * 0.37) > 0.1) input.crouch = true;
     } else if (roll < 0.32 * difficulty && cpu.cooldowns.headbutt <= 0) {
       input.headbutt = true;
     } else if (roll < 0.62 * difficulty && cpu.cooldowns.attack <= 0) {

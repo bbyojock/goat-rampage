@@ -423,7 +423,7 @@
           fx("red");
           await say([
             ["narr", "갑자기 소리가 사라졌다. 용광로 불빛이 붉게 일그러지고, 방울이 스스로 울기 시작한다.", "red"],
-            ["moon", "방울의 아이야... 네 조각이 넷이구나. 참으로 따뜻한 소리다.", "", "R"],
+            ["moon", "방울의 아이야... 벌써 조각이 셋이나 모였구나. 참으로 따뜻한 소리다.", "", "R"],
             ["moon", "물어라. 네 스승이 왜 방울을 부쉈는지."],
             ["?", "붉은 달의 속삭임", [
               { c: "\"...당신은 누구지?\"", s: { moon_talk: 1 }, r: [
@@ -654,6 +654,7 @@
     "#cine .tx{font-size:clamp(14px,3.4vh,21px);line-height:1.55;min-height:3.1em;white-space:pre-wrap;word-break:keep-all}",
     "#cine .nx{position:absolute;right:16px;bottom:8px;font-size:15px;color:#fbbf24;animation:cblink 1s infinite}",
     "@keyframes cblink{50%{opacity:.1}}",
+    "#cine .spd{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:112px;z-index:8;background:rgba(15,23,42,.75);border:1px solid #94a3b8;color:#e2e8f0;border-radius:8px;padding:6px 12px;font-size:13px}",
     "#cine .skip{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;z-index:8;background:rgba(15,23,42,.75);border:1px solid #94a3b8;color:#e2e8f0;border-radius:8px;padding:6px 12px;font-size:13px}",
     "#cine .nar{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:0 8vw;z-index:5;font-size:clamp(17px,4.4vh,30px);line-height:1.9;white-space:pre-wrap;color:#f1f5f9;text-shadow:0 0 18px rgba(251,191,36,.5);letter-spacing:.5px}",
     "#cine.nmode .nar{display:flex}#cine.nmode .box,#cine.nmode .pt{display:none}",
@@ -709,7 +710,7 @@
     '<div class="nar"></div><div class="card"><div class="c1"></div><div class="c2"></div><div class="c3"></div><div class="c4"></div></div>' +
     '<div class="vs"><div class="s1"></div><div class="s2"></div><div class="bn"></div><canvas class="c1"></canvas><canvas class="c2"></canvas><div class="vt">VS</div><div class="n1"></div><div class="n2"></div></div>' +
     '<div class="box"><div class="nm"></div><div class="tx"></div><div class="ch"></div><div class="nx">▼</div></div>' +
-    '<div class="fl"></div><button class="skip" type="button">SKIP ▶▶</button>';
+    '<div class="fl"></div><button class="skip" type="button">SKIP ▶▶</button><button class="spd" type="button">⏩ 보통</button>';
   var mood = document.createElement("div"); mood.id = "mood";
   mood.innerHTML = '<canvas></canvas><div class="mv"></div><div class="row"><div class="shard"></div><button class="jr" type="button">📖 일지</button></div><div class="toast"></div><div class="banner"></div>';
   function mount() { document.body.appendChild(mood); document.body.appendChild(el); }
@@ -766,7 +767,7 @@
     skipped = false; BUSY = true;
     el.className = "on lb" + (opt.black ? " black" : " dim");
     el.querySelector(".skip").style.display = opt.noSkip ? "none" : "";
-    ac();
+    ac(); syncSpd();
   }
   function closeCine() {
     el.className = ""; BUSY = false; waiter = null;
@@ -788,10 +789,12 @@
         i += 1; node.textContent = text.slice(0, i);
         if (i % 2 === 0 && /\S/.test(text[i - 1] || "")) blip(pitch);
         if (i >= full) { clearInterval(iv); typing = null; res(); }
-      }, 28);
+      }, speedFast() ? 11 : 28);
       typing = function () { clearInterval(iv); typing = null; node.textContent = text; res(); };
     });
   }
+  function speedFast() { try { return localStorage.getItem("goat_story_speed") === "fast"; } catch (e) { return false; } }
+  function syncSpd() { var b = el.querySelector(".spd"); if (b) b.textContent = speedFast() ? "⏩ 빠름" : "⏩ 보통"; }
   var chooser = null;
   function choose(opts) {
     return new Promise(function (res) {
@@ -811,7 +814,8 @@
     var sideOf = {};
     for (var i = 0; i < lines.length; i++) {
       var ln = lines[i], key = ln[0];
-      if (skipped && key !== "?") continue;
+      if (skipped && key !== "?" && !ln.keep) continue;
+      if (ln.keep) skipped = false;
       if (key === "?") {
         L.classList.add("dimmed"); R.classList.add("dimmed");
         nm.style.display = "none"; tx.style.fontStyle = "italic"; tx.style.color = "#fde68a";
@@ -898,6 +902,7 @@
   el.addEventListener("click", function (e) {
     var cb = e.target.closest && e.target.closest(".chb");
     if (cb && chooser) { chooser(+cb.dataset.i); return; }
+    if (e.target.classList.contains("spd")) { try { localStorage.setItem("goat_story_speed", speedFast() ? "normal" : "fast"); } catch (_) {} syncSpd(); return; }
     if (e.target.classList.contains("skip")) { skipped = true; if (typing) typing(); advance(); return; }
     if (typing) { typing(); return; }
     advance();
@@ -1003,7 +1008,7 @@
     } else {
       lines = npc.dialogue.map(function (t) { return ["bucky", t]; });
     }
-    if (qline) lines.push(["narr", qline]);
+    if (qline) { var ql = ["narr", qline]; ql.keep = true; lines.push(ql); }
     return lines;
   }
 
@@ -1049,6 +1054,17 @@
   }
 
   /* ---------- 8-B. 필드 이벤트 / 라이벌 / 일지 ---------- */
+  async function playEnding(kd) {
+    var E = ENDINGS[kd]; fanfare();
+    if (kd === "TRUE") [0.9, 1.2, 0.7, 1.5, 1.0].forEach(function (p, i) { bleat(p, 0.7, 0.07, 0.4 + i * 0.28, true); });
+    el.classList.add("black"); el.classList.remove("dim");
+    await narrate(E.pages); skipped = false;
+    el.classList.remove("black"); el.classList.add("dim");
+    await say(E.epi); skipped = false;
+    el.classList.add("black"); el.classList.remove("dim");
+    sset("ending_" + kd, 1);
+    await card(E.c1, E.c2, E.c3, E.c4, 8000);
+  }
   function checkEvents(scene) {
     var list = EVENTS[scene.regionId]; if (!list || BUSY || !scene.playerState) return;
     var px = scene.playerState.x;
@@ -1071,6 +1087,7 @@
   }
   async function rivalAfter(sc, rv, d) {
     await sleep(900);
+    if (!G.scene.isActive("ResultScene") || BUSY) { sset("ev_" + rv.ev, 1); return; }
     await runCine(async function () { await say(rivalPost(rv.n, !!d.isPlayerWin)); });
     sset("ev_" + rv.ev, 1);
     sc.scene.start("StoryScene", { regionId: rv.region });
@@ -1096,12 +1113,18 @@
     h += "<div>스승 버키에 대한 신뢰: " + (sget("confession") ? (sget("bucky_trust") ? "믿는다" : "응어리가 남았다") : "아직 모른다") + "</div>";
     var ends = ["TRUE", "GOOD", "SOLO"].filter(function (k) { return sget("ending_" + k); });
     h += "<h4>본 엔딩</h4><div>" + (ends.length ? ends.map(function (k) { return { TRUE: "함께 울린 방울", GOOD: "황금 방울의 챔피언", SOLO: "외로운 챔피언" }[k]; }).join(" / ") : '<span class="dim">없음</span>') + "</div>";
+    var rk = ends.slice(); if (!rk.length && done(BOSSQ.GOAT_ARENA)) rk = [endingKind()];
+    if (rk.length) { h += "<h4>🎬 엔딩 다시 보기</h4>"; rk.forEach(function (k) { h += '<button type="button" class="jx er" data-k="' + k + '">' + { TRUE: "함께 울린 방울", GOOD: "황금 방울의 챔피언", SOLO: "외로운 챔피언" }[k] + "</button>"; }); }
     h += '<div class="hint" style="margin-top:8px">💡 TRUE END: 라이벌과 가까워지고(♥3+), 약한 이들을 돌보고(✦2+), 스승을 믿어 보세요.</div>';
     jr.querySelector(".jc").innerHTML = h;
   }
   function openJournal() { if (BUSY) return; renderJournal(); jr.classList.add("on"); BUSY = true; }
   function closeJournal() { jr.classList.remove("on"); BUSY = false; }
-  jr.addEventListener("click", function (e) { if (e.target.classList.contains("jx") || e.target === jr) closeJournal(); });
+  jr.addEventListener("click", function (e) {
+    var t = e.target;
+    if (t.classList.contains("er")) { var k = t.getAttribute("data-k"); closeJournal(); runCine(function () { return playEnding(k); }); return; }
+    if (t.classList.contains("jx") || t === jr) closeJournal();
+  });
   mood.querySelector(".jr").addEventListener("click", openJournal);
 
   function hook() {
@@ -1130,6 +1153,14 @@
       var r = sCreate.apply(this, arguments), sc = this;
       try { markersFor(sc); } catch (e) {}
       M.warned = false; window.__RIVAL = null;
+      try {
+        var rid0 = sc.regionId;
+        if (ORDER.some(function (r) { return done(BOSSQ[r]); })) seenSet("prologue");
+        if (done(BOSSQ[rid0]) && !seenGet("ch_" + rid0)) {      // 이미 클리어한 지역: 컷신을 조용히 건너뜀
+          seenSet("ch_" + rid0); seenSet("bosspre_" + rid0); seenSet("bossdone_" + rid0);
+          (EVENTS[rid0] || []).forEach(function (ev) { sset("ev_" + ev.id, 1); });
+        }
+      } catch (e) {}
       setTimeout(function () { chapterIntro(sc, sc.regionId); }, 120);
       return r;
     };
@@ -1191,7 +1222,12 @@
             } else {
               var cid = d.p2Character, c = CAST[cid] ? cid : "RAM";
               if (!CAST[c]) c = "RAM";
-              var w = { name: "야생 " + cid, role: "", tex: "goat_" + cid, color: "#f87171", pitch: (CAST[cid] && CAST[cid].pitch) || 420 };
+              var champ = ["BRUTUS", "VOLT", "TITAN", "PHANTOM"].indexOf(cid) >= 0;
+              if (champ && !seenGet("echo_note")) {
+                seenSet("echo_note");
+                await say([["narr", "(쓰러뜨린 챔피언의 모습이다. 조각의 파편이 남긴 '광란의 메아리'가 그들을 흉내 내고 있다...)"]]);
+              }
+              var w = { name: (champ ? "광란의 " : "야생 ") + cid, role: "", tex: "goat_" + cid, color: "#f87171", pitch: (CAST[cid] && CAST[cid].pitch) || 420 };
               CAST["wild_" + cid] = w;
               await say([["wild_" + cid, WILD_LINES[cid] || "덤벼라!", "", "R"]]);
             }
@@ -1214,43 +1250,30 @@
         var rid = d.storyContext.regionId, isBoss = d.storyContext.isBoss, b = BOSS[rid];
         setShards();
         if (d.isPlayerWin && isBoss && b) {
-          var first = !seenGet("bossdone_" + rid);
-          if (!first) return;
-          seenSet("bossdone_" + rid);
+          if (seenGet("bossdone_" + rid)) return;
           return sleep(900).then(function () {
+            if (!G.scene.isActive("ResultScene") || BUSY) return;   // 그 사이 화면을 나갔으면 건너뜀
+            seenSet("bossdone_" + rid);
             return runCine(async function () {
               el.classList.add("dim");
               await say(bossPost(rid));
               skipped = false;
               if (MOON[rid]) { await say([["moon", MOON[rid], "red"]]); skipped = false; }
-              var n = shards();
-              await card("SHARD ACQUIRED", "🔔 " + n + " / 5", CHAPTER[rid].title + "의 조각이 방울에 깃들었다", b.next || "", 3800);
+              await card("SHARD ACQUIRED", "🔔 " + shards() + " / 5", CHAPTER[rid].title + "의 조각이 방울에 깃들었다", b.next || "", 3800);
               skipped = false;
-              if (rid === "GOAT_ARENA") {
-                fanfare();
-                var kd = endingKind(), E = ENDINGS[kd];
-                if (kd === "TRUE") [0.9, 1.2, 0.7, 1.5, 1.0].forEach(function (p, i) { bleat(p, 0.7, 0.07, 0.4 + i * 0.28, true); });
-                el.classList.add("black"); el.classList.remove("dim");
-                await narrate(E.pages);
-                skipped = false;
-                el.classList.remove("black"); el.classList.add("dim");
-                await say(E.epi);
-                skipped = false;
-                el.classList.add("black"); el.classList.remove("dim");
-                sset("ending_" + kd, 1);
-                await card(E.c1, E.c2, E.c3, E.c4, 8000);
-              }
-            }, { noSkip: false });
+              if (rid === "GOAT_ARENA") await playEnding(endingKind());
+            });
           });
         } else if (!d.isPlayerWin && !d.isDraw && isBoss && b) {
           return sleep(600).then(function () {
+            if (!G.scene.isActive("ResultScene") || BUSY) return;
             return runCine(async function () {
               el.classList.add("dim");
               await say([[b.id, b.lose[0], "", "R"]]);
             });
           });
         } else if (d.isPlayerWin && !isBoss) {
-          var q = ["야생 염소가 머쓱하게 물러났다.", "쓰러진 야생 염소가 엄지(뿔)를 치켜들었다.", "좋은 승부였다! 야생 염소가 길을 비켰다."];
+          var q = ["야생 염소가 머쓱하게 물러났다.", "쓰러진 야생 염소가 뿔을 번쩍 치켜들었다.", "좋은 승부였다! 야생 염소가 길을 비켰다."];
           toast(q[Math.floor(Math.random() * q.length)], 2800);
         }
       });
