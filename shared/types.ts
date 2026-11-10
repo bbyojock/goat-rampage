@@ -264,4 +264,6 @@ export interface PlayerSaveData {
   settings: PlayerSettings;
   matchHistory: MatchRecord[];
   updatedAt: number;
+  /** 어드민 계정 (모든 캐릭터/지역 해금) */
+  isAdmin?: boolean;
 }
